@@ -1,0 +1,10 @@
+services:
+  github-forwarding:
+    restart: unless-stopped
+    build: .
+    environment:
+      - GITHUB_TOKEN=$GITHUB_TOKEN
+      - WEBHOOK_URL=$WEBHOOK_URL
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./:/bot
