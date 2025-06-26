@@ -89,7 +89,7 @@ async def poll_commits(*, session: aiohttp.ClientSession):
         print("No last seen event ID found, initializing.")
         last_seen_event_id = 0
 
-    async with session.get(API_URL+"?per_page=100") as response:
+    async with session.get(API_URL) as response:
         if response.status == 200:
             events = await response.json()
             push_events = [
