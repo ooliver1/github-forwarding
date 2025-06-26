@@ -82,7 +82,7 @@ async def send_message(*, event, session: aiohttp.ClientSession):
             )
 
 
-@tasks.loop(seconds=10)
+@tasks.loop(seconds=60)
 async def poll_commits(*, session: aiohttp.ClientSession):
     last_seen_event_id = SHELF.get("last_seen_event_id", None)
     if last_seen_event_id is None:
