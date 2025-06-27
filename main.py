@@ -18,61 +18,56 @@ SHELF = shelve.open("last_seen_event_id.db", writeback=True)
 
 
 def make_payload(data):
-    commits = ",".join(f"""{{
-        "id": "{commit['sha']}",
-        "message": "{commit['message'].replace("\n", r"\n")}",
-        "url": "https://github.com/{data['repo']['name']}/commit/{commit['sha']}",
-        "author": {{
-            "name": "{commit['author']['name']}",
-            "email": "{commit['author']['email']}"
-        }}
-    }}""" for commit in data['payload']['commits'])
-
-    return f"""{{
-        "ref": "{data['payload']['ref']}",
-        "before": "{data['payload']['before']}",
-        "after": "{data['payload']['head']}",
-        "repository": {{
-            "id": {data['repo']['id']},
-            "name": "{data['repo']['name'].split('/')[1]}",
-            "full_name": "{data['repo']['name']}",
-            "owner": {{
-                "name": "{data['repo']['name'].split('/')[0]}",
-                "login": "{data['repo']['name'].split('/')[0]}",
-                "html_url": "https://github.com/{data['repo']['name'].split('/')[0]}"
-            }},
-            "html_url": "https://github.com/{data['repo']['name']}"
-        }},
-        "sender": {{
-            "login": "{data['actor']['login']}",
+    return {
+        "ref": data["payload"]["ref"],
+        "before": data["payload"]["before"],
+        "after": data["payload"]["head"],
+        "repository": {
+            "id": data["repo"]["id"],
+            "name": data["repo"]["name"].split("/")[1],
+            "full_name": data["repo"]["name"],
+            "owner": {
+                "name": data["repo"]["name"].split("/")[0],
+                "login": data["repo"]["name"].split("/")[0],
+                "html_url": f"https://github.com/{data['repo']['name'].split('/')[0]}",
+            },
+            "html_url": f"https://github.com/{data['repo']['name']}",
+        },
+        "sender": {
+            "login": data["actor"]["login"],
             "id": 1,
-            "avatar_url": "{data['actor']['avatar_url']}",
-            "html_url": "https://github.com/{data['actor']['login']}"
-        }},
-        "compare": "https://github.com/{data['repo']['name']}/compare/{data['payload']['before']}...{data['payload']['head']}",
-        "commits": [{commits}],
-        "head_commit": {{
-            "id": "{data['payload']['commits'][0]['sha']}",
-            "message": "{data['payload']['commits'][0]['message'].replace("\n", r"\n")}",
-            "url": "https://github.com/{data['repo']['name']}/commit/{data['payload']['commits'][0]['sha']}",
-            "author": {{
-                "name": "{data['payload']['commits'][0]['author']['name']}",
-                "email": "{data['payload']['commits'][0]['author']['email']}"
-            }}
-        }}
-    }}"""
-
+            "avatar_url": data["actor"]["avatar_url"],
+            "html_url": f"https://github.com/{data['actor']['login']}",
+        },
+        "compare": f"https://github.com/{data['repo']['name']}/compare/{data['payload']['before']}...{data['payload']['head']}",
+        "commits": [
+            {
+                "id": commit["sha"],
+                "message": commit["message"],
+                "url": f"https://github.com/{data['repo']['name']}/commit/{commit['sha']}",
+                "author": {
+                    "name": commit["author"]["name"],
+                    "email": commit["author"]["email"],
+                },
+            }
+            for commit in data["payload"]["commits"]
+        ],
+        "head_commit": {
+            "id": data["payload"]["commits"][0]["sha"],
+            "message": data["payload"]["commits"][0]["message"],
+            "url": f"https://github.com/{data['repo']['name']}/commit/{data['payload']['commits'][0]['sha']}",
+            "author": {
+                "name": data["payload"]["commits"][0]["author"]["name"],
+                "email": data["payload"]["commits"][0]["author"]["email"],
+            },
+        },
+    }
 
 
 async def send_message(*, event, session: aiohttp.ClientSession):
     payload = make_payload(event)
     async with session.post(
-        WEBHOOK_URL,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-github-event": "push",
-        },
+        WEBHOOK_URL, json=payload, headers={"x-github-event": "push"}
     ) as webhook_response:
         if webhook_response.status == 204:
             print("Webhook sent successfully.")
@@ -93,7 +88,9 @@ async def poll_commits(*, session: aiohttp.ClientSession):
         if response.status == 200:
             events = await response.json()
             push_events = [
-                e for e in events if e.get("type") == "PushEvent" and e["payload"]["ref"] == DEFAULT_REF
+                e
+                for e in events
+                if e.get("type") == "PushEvent" and e["payload"]["ref"] == DEFAULT_REF
             ]
             if not push_events:
                 print("No new push events found.")
